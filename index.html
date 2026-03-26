@@ -3,130 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نموذج حفظ البيانات</title>
+    <title>نظام المحاسبة - تسجيل الدخول</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
+        * {
             margin: 0;
-            padding: 20px;
-            color: #333;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        
+        body {
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3a5f, #0a2f44);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        h1 {
+        
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
             text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
         }
-        .form-group {
+        
+        .logo {
+            font-size: 48px;
             margin-bottom: 20px;
         }
+        
+        h1 {
+            color: #1e3a5f;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+            text-align: right;
+        }
+        
         label {
             display: block;
             margin-bottom: 8px;
+            color: #333;
             font-weight: bold;
         }
-        input[type="text"], textarea {
+        
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #1e3a5f;
+        }
+        
+        button {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        textarea {
-            min-height: 150px;
-            resize: vertical;
-        }
-        button {
-            background-color: #3498db;
+            background: #1e3a5f;
             color: white;
             border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 5px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
-            display: block;
-            margin: 20px auto 0;
-            transition: background-color 0.3s;
+            transition: background 0.3s;
         }
+        
         button:hover {
-            background-color: #2980b9;
+            background: #0a2f44;
         }
-        .success-message {
-            background-color: #d4edda;
-            color: #155724;
-            padding: 10px;
-            border-radius: 5px;
+        
+        .info {
             margin-top: 20px;
-            text-align: center;
-            display: none;
+            font-size: 12px;
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>نموذج إدخال البيانات وحفظها</h1>
-        <form id="dataForm">
-            <div class="form-group">
-                <label for="title">العنوان:</label>
-                <input type="text" id="title" name="title" required>
+    <div class="login-container">
+        <div class="logo">📊💰</div>
+        <h1>نظام المحاسبة</h1>
+        <form id="loginForm">
+            <div class="input-group">
+                <label>رقم العضوية</label>
+                <input type="text" id="memberId" placeholder="أدخل رقم العضوية" required>
             </div>
-            <div class="form-group">
-                <label for="subject">الموضوع:</label>
-                <textarea id="subject" name="subject" required></textarea>
-            </div>
-            <button type="submit">حفظ البيانات</button>
+            <button type="submit">دخول</button>
         </form>
-        <div id="successMessage" class="success-message">
-            تم حفظ البيانات بنجاح في الملف النصي!
+        <div class="info">
+            <p>🔹 رقم العضوية للمدير: <strong>ADMIN001</strong></p>
+            <p>🔹 الموظفين: أدخل رقم العضوية الخاص بك</p>
         </div>
     </div>
 
     <script>
-        document.getElementById('dataForm').addEventListener('submit', function(e) {
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
             e.preventDefault();
+            const memberId = document.getElementById('memberId').value;
             
-            // الحصول على القيم من النموذج
-            const title = document.getElementById('title').value;
-            const subject = document.getElementById('subject').value;
-            
-            // إنشاء محتوى الملف النصي
-            const fileContent = `العنوان: ${title}\nالموضوع: ${subject}\nالتاريخ: ${new Date().toLocaleString()}`;
-            
-            // إنشاء كائن Blob لتمثيل الملف النصي
-            const blob = new Blob([fileContent], { type: 'text/plain' });
-            
-            // إنشاء رابط لتحميل الملف
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `data_${new Date().getTime()}.txt`; // اسم الملف مع طابع زمني
-            
-            // إضافة الرابط إلى الصفحة والنقر عليه برمجياً
-            document.body.appendChild(a);
-            a.click();
-            
-            // إزالة الرابط من الصفحة
-            document.body.removeChild(a);
-            
-            // إظهار رسالة النجاح
-            document.getElementById('successMessage').style.display = 'block';
-            
-            // إخفاء رسالة النجاح بعد 3 ثوانٍ
-            setTimeout(() => {
-                document.getElementById('successMessage').style.display = 'none';
-            }, 3000);
-            
-            // إعادة تعيين النموذج
-            document.getElementById('dataForm').reset();
+            if (memberId === 'ADMIN001') {
+                window.location.href = 'admin.html';
+            } else if (memberId) {
+                localStorage.setItem('memberId', memberId);
+                window.location.href = 'dashboard.html';
+            }
         });
     </script>
 </body>
-  </html>
+</html>
