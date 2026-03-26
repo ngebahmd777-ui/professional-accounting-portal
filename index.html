@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نموذج حفظ البيانات</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto 0;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>نموذج إدخال البيانات وحفظها</h1>
+        <form id="dataForm">
+            <div class="form-group">
+                <label for="title">العنوان:</label>
+                <input type="text" id="title" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="subject">الموضوع:</label>
+                <textarea id="subject" name="subject" required></textarea>
+            </div>
+            <button type="submit">حفظ البيانات</button>
+        </form>
+        <div id="successMessage" class="success-message">
+            تم حفظ البيانات بنجاح في الملف النصي!
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('dataForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // الحصول على القيم من النموذج
+            const title = document.getElementById('title').value;
+            const subject = document.getElementById('subject').value;
+            
+            // إنشاء محتوى الملف النصي
+            const fileContent = `العنوان: ${title}\nالموضوع: ${subject}\nالتاريخ: ${new Date().toLocaleString()}`;
+            
+            // إنشاء كائن Blob لتمثيل الملف النصي
+            const blob = new Blob([fileContent], { type: 'text/plain' });
+            
+            // إنشاء رابط لتحميل الملف
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `data_${new Date().getTime()}.txt`; // اسم الملف مع طابع زمني
+            
+            // إضافة الرابط إلى الصفحة والنقر عليه برمجياً
+            document.body.appendChild(a);
+            a.click();
+            
+            // إزالة الرابط من الصفحة
+            document.body.removeChild(a);
+            
+            // إظهار رسالة النجاح
+            document.getElementById('successMessage').style.display = 'block';
+            
+            // إخفاء رسالة النجاح بعد 3 ثوانٍ
+            setTimeout(() => {
+                document.getElementById('successMessage').style.display = 'none';
+            }, 3000);
+            
+            // إعادة تعيين النموذج
+            document.getElementById('dataForm').reset();
+        });
+    </script>
+</body>
+  </html>
