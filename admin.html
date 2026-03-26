@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة المدير - نظام المحاسبة</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3a5f, #0a2f44);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .tab-btn {
+            padding: 10px 25px;
+            background: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            background: #1e3a5f;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #f8f9fa;
+            color: #1e3a5f;
+        }
+        
+        .status-pending {
+            background: #ffc107;
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .status-confirmed {
+            background: #28a745;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .confirm-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        
+        .edit-btn {
+            background: #ffc107;
+            color: #000;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .search-box {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .add-form {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .btn-primary {
+            background: #1e3a5f;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        @media (max-width: 768px) {
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <h2>👑 لوحة المدير - نظام المحاسبة</h2>
+        </div>
+        <button class="logout-btn" onclick="logout()">خروج</button>
+    </div>
+    
+    <div class="container">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('transactions')">📋 المعاملات المالية</button>
+            <button class="tab-btn" onclick="switchTab('production')">🧵 إنتاج الخياطين</button>
+            <button class="tab-btn" onclick="switchTab('objections')">✋ الاعتراضات</button>
+            <button class="tab-btn" onclick="switchTab('recurring')">🔄 التكرار التلقائي</button>
+            <button class="tab-btn" onclick="switchTab('members')">👥 الأعضاء</button>
+        </div>
+        
+        <!-- تبويب المعاملات -->
+        <div id="transactionsTab" class="tab-content active">
+            <div class="search-box">
+                <input type="text" id="searchMember" placeholder="بحث برقم العضوية..." onkeyup="filterTransactions()">
+                <select id="filterStatus" onchange="filterTransactions()">
+                    <option value="all">الكل</option>
+                    <option value="pending">قيد المراجعة</option>
+                    <option value="confirmed">مؤكد</option>
+                </select>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="transactionsTable">
+                    <thead>
+                        <tr><th>رقم العضوية</th><th>الوصف</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- تبويب الإنتاج -->
+        <div id="productionTab" class="tab-content">
+            <div class="add-form">
+                <h3>➕ إضافة إنتاج جديد</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>رقم العضوية</label>
+                        <input type="text" id="prodMemberId" placeholder="أدخل رقم العضوية">
+                    </div>
+                    <div class="form-group">
+                        <label>اسم المنتج</label>
+                        <input type="text" id="prodName" placeholder="اسم المنتج">
+                    </div>
+                    <div class="form-group">
+                        <label>الموديل</label>
+                        <input type="text" id="prodModel" placeholder="الموديل">
+                    </div>
+                    <div class="form-group">
+                        <label>الكمية</label>
+                        <input type="number" id="prodQuantity" placeholder="الكمية">
+                    </div>
+                    <div class="form-group">
+                        <label>السعر (اختياري)</label>
+                        <input type="number" id="prodPrice" placeholder="السعر">
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="addProduction()">➕ إضافة إنتاج</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="productionTable">
+                    <thead><tr><th>رقم العضوية</th><th>المنتج</th><th>الموديل</th><th>الكمية</th><th>السعر</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- تبويب الاعتراضات -->
+        <div id="objectionsTab" class="tab-content">
+            <div style="overflow-x: auto;">
+                <table id="objectionsTable">
+                    <thead><tr><th>رقم العضوية</th><th>نوع الاعتراض</th><th>التفاصيل</th><th>سبب الاعتراض</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- تبويب التكرار التلقائي -->
+        <div id="recurringTab" class="tab-content">
+            <div class="add-form">
+                <h3>🔄 إعداد تكرار تلقائي</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>رقم العضوية</label>
+                        <input type="text" id="recMemberId" placeholder="رقم العضوية">
+                    </div>
+                    <div class="form-group">
+                        <label>الوصف</label>
+                        <input type="text" id="recDescription" placeholder="وصف المعاملة">
+                    </div>
+                    <div class="form-group">
+                        <label>المبلغ</label>
+                        <input type="number" id="recAmount" placeholder="المبلغ">
+                    </div>
+                    <div class="form-group">
+                        <label>نوع التكرار</label>
+                        <select id="recType">
+                            <option value="daily">يومي</option>
+                            <option value="weekly">أسبوعي</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>التصنيف</label>
+                        <input type="text" id="recCategory" placeholder="التصنيف">
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="addRecurring()">➕ إضافة تكرار تلقائي</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="recurringTable">
+                    <thead><tr><th>رقم العضوية</th><th>الوصف</th><th>المبلغ</th><th>نوع التكرار</th><th>التصنيف</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- تبويب الأعضاء -->
+        <div id="membersTab" class="tab-content">
+            <div class="add-form">
+                <h3>➕ إضافة عضو جديد</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>رقم العضوية</label>
+                        <input type="text" id="newMemberId" placeholder="رقم العضوية">
+                    </div>
+                    <div class="form-group">
+                        <label>الاسم</label>
+                        <input type="text" id="memberName" placeholder="الاسم">
+                    </div>
+                    <div class="form-group">
+                        <label>الدور</label>
+                        <select id="memberRole">
+                            <option value="employee">موظف</option>
+                            <option value="tailor">خياط</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="addMember()">➕ إضافة عضو</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="membersTable">
+                    <thead><tr><th>رقم العضوية</th><th>الاسم</th><th>الدور</th><th>تاريخ التسجيل</th><th>إجراءات</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTab = 'transactions';
+        
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${tab}Tab`).classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            loadTabData();
+        }
+        
+        function loadTabData() {
+            switch(currentTab) {
+                case 'transactions': loadTransactions(); break;
+                case 'production': loadProductions(); break;
+                case 'objections': loadObjections(); break;
+                case 'recurring': loadRecurring(); break;
+                case 'members': loadMembers(); break;
+            }
+        }
+        
+        function loadTransactions() {
+            const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+            const searchMember = document.getElementById('searchMember')?.value.toLowerCase() || '';
+            const filterStatus = document.getElementById('filterStatus')?.value || 'all';
+            
+            let filtered = transactions;
+            if (searchMember) filtered = filtered.filter(t => t.memberId.toLowerCase().includes(searchMember));
+            if (filterStatus !== 'all') filtered = filtered.filter(t => t.status === filterStatus);
+            
+            const tbody = document.querySelector('#transactionsTable tbody');
+            tbody.innerHTML = filtered.map(t => `
+                <tr>
+                    <td>${t.memberId}</td>
+                    <td>${t.description || '-'}</td>
+                    <td>${t.amount.toLocaleString()} ريال</td>
+                    <td>${t.type === 'daily' ? 'يومي' : t.type === 'weekly' ? 'أسبوعي' : t.type || 'عام'}</td>
+                    <td>${t.date}</td>
+                    <td><span class="${t.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${t.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span></td>
+                    <td>
+                        ${t.status === 'pending' ? `<button class="confirm-btn" onclick="confirmTransaction('${t.id}')">تأكيد</button>` : ''}
+                        <button class="edit-btn" onclick="editTransaction('${t.id}')">تعديل</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function loadProductions() {
+            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
+            const tbody = document.querySelector('#productionTable tbody');
+            tbody.innerHTML = productions.map(p => `
+                <tr>
+                    <td>${p.memberId}</td>
+                    <td>${p.productName}</td>
+                    <td>${p.model || '-'}</td>
+                    <td>${p.quantity}</td>
+                    <td>${p.price ? p.price.toLocaleString() + ' ريال' : 'غير محدد'}</td>
+                    <td>${p.date}</td>
+                    <td><span class="${p.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${p.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span></td>
+                    <td>
+                        ${p.status === 'pending' ? `<button class="confirm-btn" onclick="confirmProduction('${p.id}')">تأكيد</button>` : ''}
+                        <button class="edit-btn" onclick="editProduction('${p.id}')">تعديل</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function loadObjections() {
+            const objections = JSON.parse(localStorage.getItem('objections') || '[]');
+            const tbody = document.querySelector('#objectionsTable tbody');
+            tbody.innerHTML = objections.map(o => `
+                <tr>
+                    <td>${o.memberId}</td>
+                    <td>${o.transactionId ? 'معاملة مالية' : 'إنتاج'}</td>
+                    <td>${o.transactionId || o.productionId || '-'}</td>
+                    <td>${o.reason}</td>
+                    <td>${o.date}</td>
+                    <td><span class="${o.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${o.status === 'pending' ? '⏳ قيد المراجعة' : '✅ تم الرد'}</span></td>
+                    <td><button class="confirm-btn" onclick="resolveObjection('${o.id}')">معالجة</button></td>
+                </tr>
+            `).join('');
+        }
+        
+        function loadRecurring() {
+            const recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
+            const tbody = document.querySelector('#recurringTable tbody');
+            tbody.innerHTML = recurring.map(r => `
+                <tr>
+                    <td>${r.memberId}</td>
+                    <td>${r.description}</td>
+                    <td>${r.amount.toLocaleString()} ريال</td>
+                    <td>${r.type === 'daily' ? 'يومي' : 'أسبوعي'}</td>
+                    <td>${r.category || '-'}</td>
+                    <td><span class="${r.status === 'active' ? 'status-confirmed' : 'status-pending'}">${r.status === 'active' ? 'نشط' : 'موقوف'}</span></td>
+                    <td>
+                        <button class="edit-btn" onclick="toggleRecurring('${r.id}')">${r.status === 'active' ? 'إيقاف' : 'تشغيل'}</button>
+                        <button class="confirm-btn" onclick="deleteRecurring('${r.id}')">حذف</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function loadMembers() {
+            const members = JSON.parse(localStorage.getItem('members') || '[]');
+            const tbody = document.querySelector('#membersTable tbody');
+            tbody.innerHTML = members.map(m => `
+                <tr>
+                    <td>${m.id}</td>
+                    <td>${m.name}</td>
+                    <td>${m.role === 'employee' ? 'موظف' : 'خياط'}</td>
+                    <td>${m.joinDate}</td>
+                    <td><button class="edit-btn" onclick="deleteMember('${m.id}')">حذف</button></td>
+                </tr>
+            `).join('');
+        }
+        
+        function confirmTransaction(id) {
+            const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+            const index = transactions.findIndex(t => t.id == id);
+            if (index !== -1) {
+                transactions[index].status = 'confirmed';
+                localStorage.setItem('transactions', JSON.stringify(transactions));
+                loadTransactions();
+            }
+        }
+        
+        function confirmProduction(id) {
+            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
+            const index = productions.findIndex(p => p.id == id);
+            if (index !== -1) {
+                productions[index].status = 'confirmed';
+                localStorage.setItem('productions', JSON.stringify(productions));
+                loadProductions();
+            }
+        }
+        
+        function editTransaction(id) {
+            const newAmount = prompt('أدخل المبلغ الجديد:');
+            if (newAmount) {
+                const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+                const index = transactions.findIndex(t => t.id == id);
+                if (index !== -1) {
+                    transactions[index].amount = parseFloat(newAmount);
+                    localStorage.setItem('transactions', JSON.stringify(transactions));
+                    loadTransactions();
+                }
+            }
+        }
+        
+        function editProduction(id) {
+            const newPrice = prompt('أدخل السعر الجديد (اترك فارغاً إذا غير محدد):');
+            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
+            const index = productions.findIndex(p => p.id == id);
+            if (index !== -1) {
+                if (newPrice) productions[index].price = parseFloat(newPrice);
+                localStorage.setItem('productions', JSON.stringify(productions));
+                loadProductions();
+            }
+        }
+        
+        function addProduction() {
+            const memberId = document.getElementById('prodMemberId').value;
+            const productName = document.getElementById('prodName').value;
+            const model = document.getElementById('prodModel').value;
+            const quantity = document.getElementById('prodQuantity').value;
+            const price = document.getElementById('prodPrice').value;
+            
+            if (!memberId || !productName || !quantity) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
+            productions.push({
+                id: Date.now(),
+                memberId: memberId,
+                productName: productName,
+                model: model,
+                quantity: parseInt(quantity),
+                price: price ? parseFloat(price) : null,
+                date: new Date().toLocaleDateString('ar-EG'),
+                status: 'pending'
+            });
+            localStorage.setItem('productions', JSON.stringify(productions));
+            
+            // تفريغ الحقول
+            document.getElementById('prodMemberId').value = '';
+            document.getElementById('prodName').value = '';
+            document.getElementById('prodModel').value = '';
+            document.getElementById('prodQuantity').value = '';
+            document.getElementById('prodPrice').value = '';
+            
+            loadProductions();
+            alert('تم إضافة الإنتاج بنجاح');
+        }
+        
+        function addRecurring() {
+            const memberId = document.getElementById('recMemberId').value;
+            const description = document.getElementById('recDescription').value;
+            const amount = document.getElementById('recAmount').value;
+            const type = document.getElementById('recType').value;
+            const category = document.getElementById('recCategory').value;
+            
+            if (!memberId || !description || !amount) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
+            recurring.push({
+                id: Date.now(),
+                memberId: memberId,
+                description: description,
+                amount: parseFloat(amount),
+                type: type,
+                category: category,
+                status: 'active',
+                lastRun: null
+            });
+            localStorage.setItem('recurringSettings', JSON.stringify(recurring));
+            
+            document.getElementById('recMemberId').value = '';
+            document.getElementById('recDescription').value = '';
+            document.getElementById('recAmount').value = '';
+            document.getElementById('recCategory').value = '';
+            
+            loadRecurring();
+            alert('تم إعداد التكرار التلقائي بنجاح');
+        }
+        
+        function toggleRecurring(id) {
+            const recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
+            const index = recurring.findIndex(r => r.id == id);
+            if (index !== -1) {
+                recurring[index].status = recurring[index].status === 'active' ? 'inactive' : 'active';
+                localStorage.setItem('recurringSettings', JSON.stringify(recurring));
+                loadRecurring();
+            }
+        }
+        
+        function deleteRecurring(id) {
+            if (confirm('هل أنت متأكد من حذف هذا التكرار؟')) {
+                let recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
+                recurring = recurring.filter(r => r.id != id);
+                localStorage.setItem('recurringSettings', JSON.stringify(recurring));
+                loadRecurring();
+            }
+        }
+        
+        function addMember() {
+            const id = document.getElementById('newMemberId').value;
+            const name = document.getElementById('memberName').value;
+            const role = document.getElementById('memberRole').value;
+            
+            if (!id || !name) {
+                alert('الرجاء ملء جميع الحقول');
+                return;
+            }
+            
+            const members = JSON.parse(localStorage.getItem('members') || '[]');
+            members.push({
+                id: id,
+                name: name,
+                role: role,
+                joinDate: new Date().toLocaleDateString('ar-EG')
+            });
+            localStorage.setItem('members', JSON.stringify(members));
+            
+            document.getElementById('newMemberId').value = '';
+            document.getElementById('memberName').value = '';
+            
+            loadMembers();
+            alert('تم إضافة العضو بنجاح');
+        }
+        
+        function deleteMember(id) {
+            if (confirm('هل أنت متأكد من حذف هذا العضو؟')) {
+                let members = JSON.parse(localStorage.getItem('members') || '[]');
+                members = members.filter(m => m.id != id);
+                localStorage.setItem('members', JSON.stringify(members));
+                loadMembers();
+            }
+        }
+        
+        function resolveObjection(id) {
+            const objections = JSON.parse(localStorage.getItem('objections') || '[]');
+            const index = objections.findIndex(o => o.id == id);
+            if (index !== -1) {
+                objections[index].status = 'resolved';
+                localStorage.setItem('objections', JSON.stringify(objections));
+                loadObjections();
+                alert('تم معالجة الاعتراض');
+            }
+        }
+        
+        function filterTransactions() {
+            loadTransactions();
+        }
+        
+        function logout() {
+            window.location.href = 'index.html';
+        }
+        
+        // تحميل البيانات الأولية
+        function initData() {
+            if (!localStorage.getItem('transactions')) {
+                // بيانات تجريبية
+                const sampleTransactions = [
+                    { id: 1, memberId: 'M001', amount: 5000, description: 'راتب شهر يناير', type: 'monthly', category: 'رواتب', date: '2024-01-01', status: 'confirmed' },
+                    { id: 2, memberId: 'M002', amount: 2000, description: 'مكافأة إنتاج', type: 'bonus', category: 'مكافآت', date: '2024-01-15', status: 'pending' },
+                    { id: 3, memberId: 'M001', amount: 1500, description: 'صرف يومي', type: 'daily', category: 'صرف', date: '2024-01-20', status: 'pending' }
+                ];
+                localStorage.setItem('transactions', JSON.stringify(sampleTransactions));
+            }
+            if (!localStorage.getItem('members')) {
+                localStorage.setItem('members', JSON.stringify([
+                    { id: 'M001', name: 'أحمد محمد', role: 'employee', joinDate: '2024-01-01' },
+                    { id: 'M002', name: 'خالد علي', role: 'tailor', joinDate: '2024-01-01' }
+                ]));
+            }
+            if (!localStorage.getItem('productions')) {
+                localStorage.setItem('productions', JSON.stringify([
+                    { id: 1, memberId: 'M002', productName: 'قميص رجالي', model: 'موديل 101', quantity: 50, price: 150, date: '2024-01-10', status: 'confirmed' },
+                    { id: 2, memberId: 'M002', productName: 'بنطلون', model: 'موديل 202', quantity: 30, price: null, date: '2024-01-18', status: 'pending' }
+                ]));
+            }
+        }
+        
+        initData();
+        loadTabData();
+    </script>
+</body>
+</html>
