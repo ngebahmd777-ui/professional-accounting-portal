@@ -130,19 +130,6 @@
             cursor: pointer;
         }
         
-        .search-box {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        
-        .search-box input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-        }
-        
         .add-form {
             background: #f8f9fa;
             padding: 20px;
@@ -180,6 +167,19 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
+        }
+        
+        .search-box {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
         }
         
         @media (max-width: 768px) {
@@ -220,10 +220,32 @@
                     <option value="confirmed">مؤكد</option>
                 </select>
             </div>
+            <div class="add-form">
+                <h3>➕ إضافة معاملة جديدة</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>رقم العضوية</label>
+                        <input type="text" id="transMemberId" placeholder="مثال: M001">
+                    </div>
+                    <div class="form-group">
+                        <label>الوصف</label>
+                        <input type="text" id="transDesc" placeholder="وصف المعاملة">
+                    </div>
+                    <div class="form-group">
+                        <label>المبلغ</label>
+                        <input type="number" id="transAmount" placeholder="المبلغ">
+                    </div>
+                    <div class="form-group">
+                        <label>التصنيف</label>
+                        <input type="text" id="transCategory" placeholder="رواتب، مكافآت، صرف...">
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="addTransaction()">➕ إضافة معاملة</button>
+            </div>
             <div style="overflow-x: auto;">
                 <table id="transactionsTable">
                     <thead>
-                        <tr><th>رقم العضوية</th><th>الوصف</th><th>المبلغ</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr>
+                        <tr><th>رقم العضوية</th><th>الوصف</th><th>المبلغ</th><th>التصنيف</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -237,7 +259,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>رقم العضوية</label>
-                        <input type="text" id="prodMemberId" placeholder="أدخل رقم العضوية">
+                        <input type="text" id="prodMemberId" placeholder="مثال: M002">
                     </div>
                     <div class="form-group">
                         <label>اسم المنتج</label>
@@ -270,7 +292,7 @@
         <div id="objectionsTab" class="tab-content">
             <div style="overflow-x: auto;">
                 <table id="objectionsTable">
-                    <thead><tr><th>رقم العضوية</th><th>نوع الاعتراض</th><th>التفاصيل</th><th>سبب الاعتراض</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                    <thead><tr><th>رقم العضوية</th><th>الاسم</th><th>نوع الاعتراض</th><th>سبب الاعتراض</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -347,168 +369,175 @@
         </div>
     </div>
     
-    <script>
-        let currentTab = 'transactions';
+    <script type="module">
+        import { supabase, getMembers, getTransactions, getProductions, getObjections, getRecurringSettings } from './supabase.js';
+        import { addTransaction as addTransactionAPI, confirmTransaction, updateTransaction } from './supabase.js';
+        import { addProduction as addProductionAPI, confirmProduction, updateProductionPrice } from './supabase.js';
+        import { addMember, addRecurringSetting, updateRecurringStatus, deleteRecurringSetting, resolveObjection } from './supabase.js';
         
-        function switchTab(tab) {
+        let currentTab = 'transactions';
+        let allTransactions = [];
+        let allProductions = [];
+        let allObjections = [];
+        let allRecurring = [];
+        let allMembers = [];
+        
+        async function switchTab(tab) {
             currentTab = tab;
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.getElementById(`${tab}Tab`).classList.add('active');
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
-            loadTabData();
+            await loadTabData();
         }
         
-        function loadTabData() {
+        window.switchTab = switchTab;
+        
+        async function loadTabData() {
             switch(currentTab) {
-                case 'transactions': loadTransactions(); break;
-                case 'production': loadProductions(); break;
-                case 'objections': loadObjections(); break;
-                case 'recurring': loadRecurring(); break;
-                case 'members': loadMembers(); break;
+                case 'transactions': await loadTransactions(); break;
+                case 'production': await loadProductions(); break;
+                case 'objections': await loadObjections(); break;
+                case 'recurring': await loadRecurring(); break;
+                case 'members': await loadMembers(); break;
             }
         }
         
-        function loadTransactions() {
-            const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-            const searchMember = document.getElementById('searchMember')?.value.toLowerCase() || '';
-            const filterStatus = document.getElementById('filterStatus')?.value || 'all';
-            
-            let filtered = transactions;
-            if (searchMember) filtered = filtered.filter(t => t.memberId.toLowerCase().includes(searchMember));
-            if (filterStatus !== 'all') filtered = filtered.filter(t => t.status === filterStatus);
-            
-            const tbody = document.querySelector('#transactionsTable tbody');
-            tbody.innerHTML = filtered.map(t => `
-                <tr>
-                    <td>${t.memberId}</td>
-                    <td>${t.description || '-'}</td>
-                    <td>${t.amount.toLocaleString()} ريال</td>
-                    <td>${t.type === 'daily' ? 'يومي' : t.type === 'weekly' ? 'أسبوعي' : t.type || 'عام'}</td>
-                    <td>${t.date}</td>
-                    <td><span class="${t.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${t.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span></td>
-                    <td>
-                        ${t.status === 'pending' ? `<button class="confirm-btn" onclick="confirmTransaction('${t.id}')">تأكيد</button>` : ''}
-                        <button class="edit-btn" onclick="editTransaction('${t.id}')">تعديل</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function loadProductions() {
-            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
-            const tbody = document.querySelector('#productionTable tbody');
-            tbody.innerHTML = productions.map(p => `
-                <tr>
-                    <td>${p.memberId}</td>
-                    <td>${p.productName}</td>
-                    <td>${p.model || '-'}</td>
-                    <td>${p.quantity}</td>
-                    <td>${p.price ? p.price.toLocaleString() + ' ريال' : 'غير محدد'}</td>
-                    <td>${p.date}</td>
-                    <td><span class="${p.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${p.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span></td>
-                    <td>
-                        ${p.status === 'pending' ? `<button class="confirm-btn" onclick="confirmProduction('${p.id}')">تأكيد</button>` : ''}
-                        <button class="edit-btn" onclick="editProduction('${p.id}')">تعديل</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function loadObjections() {
-            const objections = JSON.parse(localStorage.getItem('objections') || '[]');
-            const tbody = document.querySelector('#objectionsTable tbody');
-            tbody.innerHTML = objections.map(o => `
-                <tr>
-                    <td>${o.memberId}</td>
-                    <td>${o.transactionId ? 'معاملة مالية' : 'إنتاج'}</td>
-                    <td>${o.transactionId || o.productionId || '-'}</td>
-                    <td>${o.reason}</td>
-                    <td>${o.date}</td>
-                    <td><span class="${o.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${o.status === 'pending' ? '⏳ قيد المراجعة' : '✅ تم الرد'}</span></td>
-                    <td><button class="confirm-btn" onclick="resolveObjection('${o.id}')">معالجة</button></td>
-                </tr>
-            `).join('');
-        }
-        
-        function loadRecurring() {
-            const recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
-            const tbody = document.querySelector('#recurringTable tbody');
-            tbody.innerHTML = recurring.map(r => `
-                <tr>
-                    <td>${r.memberId}</td>
-                    <td>${r.description}</td>
-                    <td>${r.amount.toLocaleString()} ريال</td>
-                    <td>${r.type === 'daily' ? 'يومي' : 'أسبوعي'}</td>
-                    <td>${r.category || '-'}</td>
-                    <td><span class="${r.status === 'active' ? 'status-confirmed' : 'status-pending'}">${r.status === 'active' ? 'نشط' : 'موقوف'}</span></td>
-                    <td>
-                        <button class="edit-btn" onclick="toggleRecurring('${r.id}')">${r.status === 'active' ? 'إيقاف' : 'تشغيل'}</button>
-                        <button class="confirm-btn" onclick="deleteRecurring('${r.id}')">حذف</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function loadMembers() {
-            const members = JSON.parse(localStorage.getItem('members') || '[]');
-            const tbody = document.querySelector('#membersTable tbody');
-            tbody.innerHTML = members.map(m => `
-                <tr>
-                    <td>${m.id}</td>
-                    <td>${m.name}</td>
-                    <td>${m.role === 'employee' ? 'موظف' : 'خياط'}</td>
-                    <td>${m.joinDate}</td>
-                    <td><button class="edit-btn" onclick="deleteMember('${m.id}')">حذف</button></td>
-                </tr>
-            `).join('');
-        }
-        
-        function confirmTransaction(id) {
-            const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-            const index = transactions.findIndex(t => t.id == id);
-            if (index !== -1) {
-                transactions[index].status = 'confirmed';
-                localStorage.setItem('transactions', JSON.stringify(transactions));
-                loadTransactions();
+        async function loadTransactions() {
+            try {
+                allTransactions = await getTransactions();
+                const searchMember = document.getElementById('searchMember')?.value.toLowerCase() || '';
+                const filterStatus = document.getElementById('filterStatus')?.value || 'all';
+                
+                let filtered = allTransactions;
+                if (searchMember) filtered = filtered.filter(t => t.member_id?.toLowerCase().includes(searchMember));
+                if (filterStatus !== 'all') filtered = filtered.filter(t => t.status === filterStatus);
+                
+                const tbody = document.querySelector('#transactionsTable tbody');
+                tbody.innerHTML = filtered.map(t => `
+                    <tr>
+                        <td>${t.member_id}</td>
+                        <td>${t.description || '-'}</td>
+                        <td>${t.amount.toLocaleString()} ريال</td>
+                        <td>${t.category || '-'}</td>
+                        <td>${t.date}</td>
+                        <td><span class="${t.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${t.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span></td>
+                        <td>
+                            ${t.status === 'pending' ? `<button class="confirm-btn" onclick="confirmTransactionItem(${t.id})">تأكيد</button>` : ''}
+                            <button class="edit-btn" onclick="editTransactionItem(${t.id})">تعديل</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('خطأ:', error);
             }
         }
         
-        function confirmProduction(id) {
-            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
-            const index = productions.findIndex(p => p.id == id);
-            if (index !== -1) {
-                productions[index].status = 'confirmed';
-                localStorage.setItem('productions', JSON.stringify(productions));
-                loadProductions();
+        window.filterTransactions = loadTransactions;
+        
+        window.confirmTransactionItem = async function(id) {
+            try {
+                await confirmTransaction(id, 'ADMIN001');
+                await loadTransactions();
+                alert('تم تأكيد المعاملة بنجاح');
+            } catch (error) {
+                alert('خطأ في تأكيد المعاملة');
             }
         }
         
-        function editTransaction(id) {
+        window.editTransactionItem = async function(id) {
             const newAmount = prompt('أدخل المبلغ الجديد:');
             if (newAmount) {
-                const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-                const index = transactions.findIndex(t => t.id == id);
-                if (index !== -1) {
-                    transactions[index].amount = parseFloat(newAmount);
-                    localStorage.setItem('transactions', JSON.stringify(transactions));
-                    loadTransactions();
+                try {
+                    await updateTransaction(id, { amount: parseFloat(newAmount) });
+                    await loadTransactions();
+                    alert('تم تعديل المعاملة بنجاح');
+                } catch (error) {
+                    alert('خطأ في تعديل المعاملة');
                 }
             }
         }
         
-        function editProduction(id) {
-            const newPrice = prompt('أدخل السعر الجديد (اترك فارغاً إذا غير محدد):');
-            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
-            const index = productions.findIndex(p => p.id == id);
-            if (index !== -1) {
-                if (newPrice) productions[index].price = parseFloat(newPrice);
-                localStorage.setItem('productions', JSON.stringify(productions));
-                loadProductions();
+        window.addTransaction = async function() {
+            const memberId = document.getElementById('transMemberId').value;
+            const description = document.getElementById('transDesc').value;
+            const amount = document.getElementById('transAmount').value;
+            const category = document.getElementById('transCategory').value;
+            
+            if (!memberId || !description || !amount) {
+                alert('الرجاء ملء جميع الحقول');
+                return;
+            }
+            
+            try {
+                await addTransactionAPI({
+                    member_id: memberId,
+                    description: description,
+                    amount: parseFloat(amount),
+                    category: category,
+                    date: new Date().toISOString().split('T')[0],
+                    type: 'manual',
+                    created_by: 'ADMIN001'
+                });
+                await loadTransactions();
+                document.getElementById('transMemberId').value = '';
+                document.getElementById('transDesc').value = '';
+                document.getElementById('transAmount').value = '';
+                document.getElementById('transCategory').value = '';
+                alert('تم إضافة المعاملة بنجاح');
+            } catch (error) {
+                alert('خطأ في إضافة المعاملة');
             }
         }
         
-        function addProduction() {
+        async function loadProductions() {
+            try {
+                allProductions = await getProductions();
+                const tbody = document.querySelector('#productionTable tbody');
+                tbody.innerHTML = allProductions.map(p => `
+                    <tr>
+                        <td>${p.member_id}</td>
+                        <td>${p.product_name}</td>
+                        <td>${p.model || '-'}</td>
+                        <td>${p.quantity}</td>
+                        <td>${p.price ? p.price.toLocaleString() + ' ريال' : 'غير محدد'}</td>
+                        <td>${p.date}</td>
+                        <td><span class="${p.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${p.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span></td>
+                        <td>
+                            ${p.status === 'pending' ? `<button class="confirm-btn" onclick="confirmProductionItem(${p.id})">تأكيد</button>` : ''}
+                            <button class="edit-btn" onclick="editProductionItem(${p.id})">تعديل السعر</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('خطأ:', error);
+            }
+        }
+        
+        window.confirmProductionItem = async function(id) {
+            try {
+                await confirmProduction(id, 'ADMIN001');
+                await loadProductions();
+                alert('تم تأكيد الإنتاج بنجاح');
+            } catch (error) {
+                alert('خطأ في تأكيد الإنتاج');
+            }
+        }
+        
+        window.editProductionItem = async function(id) {
+            const newPrice = prompt('أدخل السعر الجديد (اترك فارغاً إذا غير محدد):');
+            if (newPrice !== null) {
+                try {
+                    await updateProductionPrice(id, newPrice ? parseFloat(newPrice) : null);
+                    await loadProductions();
+                    alert('تم تعديل السعر بنجاح');
+                } catch (error) {
+                    alert('خطأ في تعديل السعر');
+                }
+            }
+        }
+        
+        window.addProduction = async function() {
             const memberId = document.getElementById('prodMemberId').value;
             const productName = document.getElementById('prodName').value;
             const model = document.getElementById('prodModel').value;
@@ -520,31 +549,109 @@
                 return;
             }
             
-            const productions = JSON.parse(localStorage.getItem('productions') || '[]');
-            productions.push({
-                id: Date.now(),
-                memberId: memberId,
-                productName: productName,
-                model: model,
-                quantity: parseInt(quantity),
-                price: price ? parseFloat(price) : null,
-                date: new Date().toLocaleDateString('ar-EG'),
-                status: 'pending'
-            });
-            localStorage.setItem('productions', JSON.stringify(productions));
-            
-            // تفريغ الحقول
-            document.getElementById('prodMemberId').value = '';
-            document.getElementById('prodName').value = '';
-            document.getElementById('prodModel').value = '';
-            document.getElementById('prodQuantity').value = '';
-            document.getElementById('prodPrice').value = '';
-            
-            loadProductions();
-            alert('تم إضافة الإنتاج بنجاح');
+            try {
+                await addProductionAPI({
+                    member_id: memberId,
+                    product_name: productName,
+                    model: model,
+                    quantity: parseInt(quantity),
+                    price: price ? parseFloat(price) : null,
+                    date: new Date().toISOString().split('T')[0],
+                    created_by: 'ADMIN001'
+                });
+                await loadProductions();
+                document.getElementById('prodMemberId').value = '';
+                document.getElementById('prodName').value = '';
+                document.getElementById('prodModel').value = '';
+                document.getElementById('prodQuantity').value = '';
+                document.getElementById('prodPrice').value = '';
+                alert('تم إضافة الإنتاج بنجاح');
+            } catch (error) {
+                alert('خطأ في إضافة الإنتاج');
+            }
         }
         
-        function addRecurring() {
+        async function loadObjections() {
+            try {
+                allObjections = await getObjections();
+                const members = await getMembers();
+                const memberMap = {};
+                members.forEach(m => memberMap[m.id] = m.name);
+                
+                const tbody = document.querySelector('#objectionsTable tbody');
+                tbody.innerHTML = allObjections.map(o => `
+                    <tr>
+                        <td>${o.member_id}</td>
+                        <td>${memberMap[o.member_id] || '-'}</td>
+                        <td>${o.transaction_id ? 'معاملة مالية' : 'إنتاج'}</td>
+                        <td>${o.reason}</td>
+                        <td>${new Date(o.date).toLocaleDateString('ar-EG')}</td>
+                        <td><span class="${o.status === 'pending' ? 'status-pending' : 'status-confirmed'}">${o.status === 'pending' ? '⏳ قيد المراجعة' : '✅ تم الرد'}</span></td>
+                        <td>${o.status === 'pending' ? `<button class="confirm-btn" onclick="resolveObjectionItem(${o.id})">معالجة</button>` : ''}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('خطأ:', error);
+            }
+        }
+        
+        window.resolveObjectionItem = async function(id) {
+            try {
+                await resolveObjection(id, 'ADMIN001');
+                await loadObjections();
+                alert('تم معالجة الاعتراض بنجاح');
+            } catch (error) {
+                alert('خطأ في معالجة الاعتراض');
+            }
+        }
+        
+        async function loadRecurring() {
+            try {
+                allRecurring = await getRecurringSettings();
+                const tbody = document.querySelector('#recurringTable tbody');
+                tbody.innerHTML = allRecurring.map(r => `
+                    <tr>
+                        <td>${r.member_id}</td>
+                        <td>${r.description}</td>
+                        <td>${r.amount.toLocaleString()} ريال</td>
+                        <td>${r.type === 'daily' ? 'يومي' : 'أسبوعي'}</td>
+                        <td>${r.category || '-'}</td>
+                        <td><span class="${r.status === 'active' ? 'status-confirmed' : 'status-pending'}">${r.status === 'active' ? 'نشط' : 'موقوف'}</span></td>
+                        <td>
+                            <button class="edit-btn" onclick="toggleRecurringItem(${r.id}, '${r.status}')">${r.status === 'active' ? 'إيقاف' : 'تشغيل'}</button>
+                            <button class="confirm-btn" onclick="deleteRecurringItem(${r.id})">حذف</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('خطأ:', error);
+            }
+        }
+        
+        window.toggleRecurringItem = async function(id, currentStatus) {
+            try {
+                const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+                await updateRecurringStatus(id, newStatus);
+                await loadRecurring();
+                alert('تم تغيير حالة التكرار');
+            } catch (error) {
+                alert('خطأ في تغيير الحالة');
+            }
+        }
+        
+        window.deleteRecurringItem = async function(id) {
+            if (confirm('هل أنت متأكد من حذف هذا التكرار؟')) {
+                try {
+                    await deleteRecurringSetting(id);
+                    await loadRecurring();
+                    alert('تم حذف التكرار بنجاح');
+                } catch (error) {
+                    alert('خطأ في حذف التكرار');
+                }
+            }
+        }
+        
+        window.addRecurring = async function() {
             const memberId = document.getElementById('recMemberId').value;
             const description = document.getElementById('recDescription').value;
             const amount = document.getElementById('recAmount').value;
@@ -556,48 +663,45 @@
                 return;
             }
             
-            const recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
-            recurring.push({
-                id: Date.now(),
-                memberId: memberId,
-                description: description,
-                amount: parseFloat(amount),
-                type: type,
-                category: category,
-                status: 'active',
-                lastRun: null
-            });
-            localStorage.setItem('recurringSettings', JSON.stringify(recurring));
-            
-            document.getElementById('recMemberId').value = '';
-            document.getElementById('recDescription').value = '';
-            document.getElementById('recAmount').value = '';
-            document.getElementById('recCategory').value = '';
-            
-            loadRecurring();
-            alert('تم إعداد التكرار التلقائي بنجاح');
-        }
-        
-        function toggleRecurring(id) {
-            const recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
-            const index = recurring.findIndex(r => r.id == id);
-            if (index !== -1) {
-                recurring[index].status = recurring[index].status === 'active' ? 'inactive' : 'active';
-                localStorage.setItem('recurringSettings', JSON.stringify(recurring));
-                loadRecurring();
+            try {
+                await addRecurringSetting({
+                    member_id: memberId,
+                    description: description,
+                    amount: parseFloat(amount),
+                    type: type,
+                    category: category,
+                    created_by: 'ADMIN001'
+                });
+                await loadRecurring();
+                document.getElementById('recMemberId').value = '';
+                document.getElementById('recDescription').value = '';
+                document.getElementById('recAmount').value = '';
+                document.getElementById('recCategory').value = '';
+                alert('تم إعداد التكرار التلقائي بنجاح');
+            } catch (error) {
+                alert('خطأ في إعداد التكرار');
             }
         }
         
-        function deleteRecurring(id) {
-            if (confirm('هل أنت متأكد من حذف هذا التكرار؟')) {
-                let recurring = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
-                recurring = recurring.filter(r => r.id != id);
-                localStorage.setItem('recurringSettings', JSON.stringify(recurring));
-                loadRecurring();
+        async function loadMembers() {
+            try {
+                allMembers = await getMembers();
+                const tbody = document.querySelector('#membersTable tbody');
+                tbody.innerHTML = allMembers.map(m => `
+                    <tr>
+                        <td>${m.id}</td>
+                        <td>${m.name}</td>
+                        <td>${m.role === 'employee' ? 'موظف' : m.role === 'tailor' ? 'خياط' : 'مدير'}</td>
+                        <td>${new Date(m.join_date).toLocaleDateString('ar-EG')}</td>
+                        <td>${m.role !== 'admin' ? `<button class="edit-btn" onclick="deleteMemberItem('${m.id}')">حذف</button>` : '-'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('خطأ:', error);
             }
         }
         
-        function addMember() {
+        window.addMember = async function() {
             const id = document.getElementById('newMemberId').value;
             const name = document.getElementById('memberName').value;
             const role = document.getElementById('memberRole').value;
@@ -607,76 +711,85 @@
                 return;
             }
             
-            const members = JSON.parse(localStorage.getItem('members') || '[]');
-            members.push({
-                id: id,
-                name: name,
-                role: role,
-                joinDate: new Date().toLocaleDateString('ar-EG')
-            });
-            localStorage.setItem('members', JSON.stringify(members));
-            
-            document.getElementById('newMemberId').value = '';
-            document.getElementById('memberName').value = '';
-            
-            loadMembers();
-            alert('تم إضافة العضو بنجاح');
+            try {
+                await addMember({
+                    id: id,
+                    name: name,
+                    role: role,
+                    join_date: new Date().toISOString()
+                });
+                await loadMembers();
+                document.getElementById('newMemberId').value = '';
+                document.getElementById('memberName').value = '';
+                alert('تم إضافة العضو بنجاح');
+            } catch (error) {
+                alert('خطأ في إضافة العضو');
+            }
         }
         
-        function deleteMember(id) {
+        window.deleteMemberItem = async function(id) {
             if (confirm('هل أنت متأكد من حذف هذا العضو؟')) {
-                let members = JSON.parse(localStorage.getItem('members') || '[]');
-                members = members.filter(m => m.id != id);
-                localStorage.setItem('members', JSON.stringify(members));
-                loadMembers();
+                try {
+                    const { error } = await supabase.from('members').delete().eq('id', id);
+                    if (error) throw error;
+                    await loadMembers();
+                    alert('تم حذف العضو بنجاح');
+                } catch (error) {
+                    alert('خطأ في حذف العضو');
+                }
             }
-        }
-        
-        function resolveObjection(id) {
-            const objections = JSON.parse(localStorage.getItem('objections') || '[]');
-            const index = objections.findIndex(o => o.id == id);
-            if (index !== -1) {
-                objections[index].status = 'resolved';
-                localStorage.setItem('objections', JSON.stringify(objections));
-                loadObjections();
-                alert('تم معالجة الاعتراض');
-            }
-        }
-        
-        function filterTransactions() {
-            loadTransactions();
         }
         
         function logout() {
+            localStorage.clear();
             window.location.href = 'index.html';
         }
         
-        // تحميل البيانات الأولية
-        function initData() {
-            if (!localStorage.getItem('transactions')) {
-                // بيانات تجريبية
-                const sampleTransactions = [
-                    { id: 1, memberId: 'M001', amount: 5000, description: 'راتب شهر يناير', type: 'monthly', category: 'رواتب', date: '2024-01-01', status: 'confirmed' },
-                    { id: 2, memberId: 'M002', amount: 2000, description: 'مكافأة إنتاج', type: 'bonus', category: 'مكافآت', date: '2024-01-15', status: 'pending' },
-                    { id: 3, memberId: 'M001', amount: 1500, description: 'صرف يومي', type: 'daily', category: 'صرف', date: '2024-01-20', status: 'pending' }
-                ];
-                localStorage.setItem('transactions', JSON.stringify(sampleTransactions));
-            }
-            if (!localStorage.getItem('members')) {
-                localStorage.setItem('members', JSON.stringify([
-                    { id: 'M001', name: 'أحمد محمد', role: 'employee', joinDate: '2024-01-01' },
-                    { id: 'M002', name: 'خالد علي', role: 'tailor', joinDate: '2024-01-01' }
-                ]));
-            }
-            if (!localStorage.getItem('productions')) {
-                localStorage.setItem('productions', JSON.stringify([
-                    { id: 1, memberId: 'M002', productName: 'قميص رجالي', model: 'موديل 101', quantity: 50, price: 150, date: '2024-01-10', status: 'confirmed' },
-                    { id: 2, memberId: 'M002', productName: 'بنطلون', model: 'موديل 202', quantity: 30, price: null, date: '2024-01-18', status: 'pending' }
-                ]));
+        window.logout = logout;
+        
+        // تشغيل التكرار التلقائي
+        async function runAutoRecurring() {
+            const settings = await getRecurringSettings();
+            const today = new Date().toISOString().split('T')[0];
+            
+            for (const setting of settings) {
+                let shouldRun = false;
+                if (setting.type === 'daily') {
+                    shouldRun = setting.last_run !== today;
+                } else if (setting.type === 'weekly') {
+                    if (!setting.last_run) {
+                        shouldRun = true;
+                    } else {
+                        const lastRun = new Date(setting.last_run);
+                        const todayDate = new Date(today);
+                        const diffDays = Math.floor((todayDate - lastRun) / (1000 * 60 * 60 * 24));
+                        shouldRun = diffDays >= 7;
+                    }
+                }
+                
+                if (shouldRun) {
+                    await addTransactionAPI({
+                        member_id: setting.member_id,
+                        amount: setting.amount,
+                        description: setting.description,
+                        type: setting.type,
+                        category: setting.category,
+                        date: today,
+                        created_by: 'system'
+                    });
+                    
+                    await supabase
+                        .from('recurring_settings')
+                        .update({ last_run: today })
+                        .eq('id', setting.id);
+                }
             }
         }
         
-        initData();
+        // تشغيل عند تحميل الصفحة
+        runAutoRecurring();
+        setInterval(runAutoRecurring, 3600000);
+        
         loadTabData();
     </script>
 </body>
