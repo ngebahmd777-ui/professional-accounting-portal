@@ -84,6 +84,12 @@
             background: #0a2f44;
         }
         
+        .error {
+            color: red;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
         .info {
             margin-top: 20px;
             font-size: 12px;
@@ -102,22 +108,50 @@
             </div>
             <button type="submit">دخول</button>
         </form>
+        <div id="errorMsg" class="error"></div>
         <div class="info">
-            <p>🔹 رقم العضوية للمدير: <strong>*****</strong></p>
-            <p>🔹 الموظفين: أدخل رقم العضوية الخاص بك</p>
+            <p>🔹 رقم العضوية للمدير: <strong>ADMIN001</strong></p>
+            <p>🔹 للموظفين: M001, M002, M003</p>
         </div>
     </div>
 
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+    <script type="module">
+        import { supabase, getMemberById } from './supabase.js';
+        
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const memberId = document.getElementById('memberId').value;
+            const memberId = document.getElementById('memberId').value.trim();
+            const errorDiv = document.getElementById('errorMsg');
             
-            if (memberId === 'ADMIN001') {
-                window.location.href = 'admin.html';
-            } else if (memberId) {
-                localStorage.setItem('memberId', memberId);
-                window.location.href = 'dashboard.html';
+            if (!memberId) {
+                errorDiv.textContent = 'الرجاء إدخال رقم العضوية';
+                return;
+            }
+            
+            try {
+                // التحقق من وجود العضو في قاعدة البيانات
+                const member = await getMemberById(memberId);
+                
+                if (!member) {
+                    errorDiv.textContent = 'رقم العضوية غير صحيح';
+                    return;
+                }
+                
+                // حفظ معلومات المستخدم
+                localStorage.setItem('memberId', member.id);
+                localStorage.setItem('memberRole', member.role);
+                localStorage.setItem('memberName', member.name);
+                
+                // التوجيه حسب الدور
+                if (member.role === 'admin') {
+                    window.location.href = 'admin.html';
+                } else {
+                    window.location.href = 'dashboard.html';
+                }
+                
+            } catch (error) {
+                console.error('خطأ:', error);
+                errorDiv.textContent = 'حدث خطأ في الاتصال بقاعدة البيانات';
             }
         });
     </script>
