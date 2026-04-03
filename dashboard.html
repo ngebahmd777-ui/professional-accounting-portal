@@ -106,11 +106,6 @@
             flex-wrap: wrap;
         }
         
-        .transaction-item.pending {
-            border-right-color: #ffc107;
-            background: #fff9e6;
-        }
-        
         .transaction-item.confirmed {
             border-right-color: #28a745;
             background: #e8f5e9;
@@ -233,7 +228,7 @@
             <h2>📊 نظام المحاسبة</h2>
         </div>
         <div>
-            <span class="user-info">👤 رقم العضوية: <span id="memberIdDisplay"></span></span>
+            <span class="user-info">👤 <span id="memberName"></span> | <span id="memberId"></span></span>
             <button class="logout-btn" onclick="logout()">خروج</button>
         </div>
     </div>
@@ -265,12 +260,11 @@
         </div>
     </div>
     
-    <!-- Modal الاعتراض -->
     <div id="objectModal" class="modal">
         <div class="modal-content">
-            <h3>✍️ تقديم اعتراض</h3>
-            <label>رقم المعاملة:</label>
-            <input type="text" id="objectTransactionId" readonly style="width:100%; padding:8px; margin:10px 0; border:1px solid #ddd; border-radius:5px;">
+            <h3>✋ تقديم اعتراض</h3>
+            <label>نوع المعاملة:</label>
+            <input type="text" id="objectType" readonly style="width:100%; padding:8px; margin:10px 0; border:1px solid #ddd; border-radius:5px;">
             <label>سبب الاعتراض:</label>
             <textarea id="objectReason" rows="4" placeholder="اكتب سبب الاعتراض بالتفصيل..."></textarea>
             <div class="modal-buttons">
@@ -280,193 +274,151 @@
         </div>
     </div>
     
-    <script>
+    <script type="module">
+        import { supabase, getTransactions, getProductions, addObjection } from './supabase.js';
+        
         let currentMemberId = '';
-        let transactions = [];
-        let productions = [];
+        let currentMemberName = '';
+        let currentTransactions = [];
+        let currentProductions = [];
+        let currentObjectItem = null;
+        let currentObjectType = '';
         
-        // تحميل البيانات من localStorage
-        function loadData() {
+        // تحميل بيانات المستخدم
+        function loadUserData() {
             currentMemberId = localStorage.getItem('memberId');
-            document.getElementById('memberIdDisplay').innerText = currentMemberId;
+            currentMemberName = localStorage.getItem('memberName');
             
-            // تحميل المعاملات
-            const allTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-            transactions = allTransactions.filter(t => t.memberId === currentMemberId);
-            
-            // تحميل الإنتاج
-            const allProductions = JSON.parse(localStorage.getItem('productions') || '[]');
-            productions = allProductions.filter(p => p.memberId === currentMemberId);
-            
-            updateUI();
+            document.getElementById('memberId').innerText = currentMemberId;
+            document.getElementById('memberName').innerText = currentMemberName;
         }
         
-        function updateUI() {
-            // حساب الإجماليات
-            const pendingTotal = transactions.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.amount, 0);
-            const confirmedTotal = transactions.filter(t => t.status === 'confirmed').reduce((sum, t) => sum + t.amount, 0);
-            const pendingCount = transactions.filter(t => t.status === 'pending').length;
-            
-            document.getElementById('totalPending').innerHTML = pendingTotal.toLocaleString() + ' ريال';
-            document.getElementById('totalConfirmed').innerHTML = confirmedTotal.toLocaleString() + ' ريال';
-            document.getElementById('pendingCount').innerHTML = pendingCount;
-            
-            // عرض المعاملات
-            const transactionsHtml = transactions.map(t => `
-                <div class="transaction-item ${t.status}">
-                    <div class="info">
-                        <div><strong>${t.description || 'معاملة مالية'}</strong></div>
-                        <div class="date">📅 ${t.date} | 🔄 ${t.type} | 🏷️ ${t.category || 'عام'}</div>
+        // تحميل المعاملات
+        async function loadTransactions() {
+            try {
+                const transactions = await getTransactions({ member_id: currentMemberId });
+                currentTransactions = transactions;
+                
+                const pendingTotal = transactions.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.amount, 0);
+                const confirmedTotal = transactions.filter(t => t.status === 'confirmed').reduce((sum, t) => sum + t.amount, 0);
+                const pendingCount = transactions.filter(t => t.status === 'pending').length;
+                
+                document.getElementById('totalPending').innerHTML = pendingTotal.toLocaleString() + ' ريال';
+                document.getElementById('totalConfirmed').innerHTML = confirmedTotal.toLocaleString() + ' ريال';
+                document.getElementById('pendingCount').innerHTML = pendingCount;
+                
+                const html = transactions.map(t => `
+                    <div class="transaction-item ${t.status}">
+                        <div class="info">
+                            <div><strong>${t.description || 'معاملة مالية'}</strong></div>
+                            <div class="date">📅 ${t.date} | 🏷️ ${t.category || 'عام'}</div>
+                        </div>
+                        <div class="amount">${t.amount.toLocaleString()} ريال</div>
+                        <div>
+                            <span class="status ${t.status}">${t.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span>
+                            ${t.status === 'pending' ? `<button class="object-btn" onclick='openObjection("transaction", ${JSON.stringify(t).replace(/'/g, "\\'")})'>✋ اعتراض</button>` : ''}
+                        </div>
                     </div>
-                    <div class="amount">${t.amount.toLocaleString()} ريال</div>
-                    <div>
-                        <span class="status ${t.status}">${t.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span>
-                        ${t.status === 'pending' ? `<button class="object-btn" onclick="openModal('${t.id}')">✋ اعتراض</button>` : ''}
-                    </div>
-                </div>
-            `).join('');
-            
-            document.getElementById('transactionsList').innerHTML = transactionsHtml || '<p style="text-align:center; color:#666;">لا توجد معاملات</p>';
-            
-            // عرض الإنتاج
-            const productionsHtml = productions.map(p => `
-                <div class="transaction-item ${p.status}">
-                    <div class="info">
-                        <div><strong>${p.productName || 'منتج'}</strong></div>
-                        <div class="date">📅 ${p.date} | 👕 ${p.model || 'موديل'}</div>
-                    </div>
-                    <div class="amount">${p.quantity} قطعة</div>
-                    <div>
-                        <span class="status ${p.status}">${p.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span>
-                        ${p.status === 'pending' ? `<button class="object-btn" onclick="openProductionModal('${p.id}')">✋ اعتراض</button>` : ''}
-                    </div>
-                </div>
-            `).join('');
-            
-            document.getElementById('productionList').innerHTML = productionsHtml || '<p style="text-align:center; color:#666;">لا توجد إنتاجات</p>';
+                `).join('');
+                
+                document.getElementById('transactionsList').innerHTML = html || '<p style="text-align:center; color:#666;">لا توجد معاملات</p>';
+            } catch (error) {
+                console.error('خطأ في تحميل المعاملات:', error);
+                document.getElementById('transactionsList').innerHTML = '<p style="text-align:center; color:red;">حدث خطأ في تحميل المعاملات</p>';
+            }
         }
         
-        let currentObjectTransaction = null;
-        let currentObjectProduction = null;
+        // تحميل الإنتاج
+        async function loadProductions() {
+            try {
+                const productions = await getProductions({ member_id: currentMemberId });
+                currentProductions = productions;
+                
+                const html = productions.map(p => `
+                    <div class="transaction-item ${p.status}">
+                        <div class="info">
+                            <div><strong>${p.product_name}</strong> - ${p.model || 'موديل غير محدد'}</div>
+                            <div class="date">📅 ${p.date} | 📦 ${p.quantity} قطعة</div>
+                        </div>
+                        <div class="amount">${p.price ? p.price.toLocaleString() + ' ريال' : 'سعر غير محدد'}</div>
+                        <div>
+                            <span class="status ${p.status}">${p.status === 'pending' ? '⏳ قيد المراجعة' : '✅ مؤكد'}</span>
+                            ${p.status === 'pending' ? `<button class="object-btn" onclick='openObjection("production", ${JSON.stringify(p).replace(/'/g, "\\'")})'>✋ اعتراض</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('productionList').innerHTML = html || '<p style="text-align:center; color:#666;">لا توجد إنتاجات</p>';
+            } catch (error) {
+                console.error('خطأ في تحميل الإنتاج:', error);
+                document.getElementById('productionList').innerHTML = '<p style="text-align:center; color:red;">حدث خطأ في تحميل الإنتاج</p>';
+            }
+        }
         
-        function openModal(transactionId) {
-            currentObjectTransaction = transactions.find(t => t.id === transactionId);
-            document.getElementById('objectTransactionId').value = currentObjectTransaction?.id || '';
+        // فتح نافذة الاعتراض
+        window.openObjection = function(type, item) {
+            currentObjectType = type;
+            currentObjectItem = item;
+            document.getElementById('objectType').value = type === 'transaction' ? 'معاملة مالية: ' + item.description : 'إنتاج: ' + item.product_name;
             document.getElementById('objectReason').value = '';
             document.getElementById('objectModal').style.display = 'flex';
         }
         
-        function openProductionModal(productionId) {
-            currentObjectProduction = productions.find(p => p.id === productionId);
-            document.getElementById('objectTransactionId').value = currentObjectProduction?.productName || '';
-            document.getElementById('objectReason').value = '';
-            document.getElementById('objectModal').style.display = 'flex';
-        }
-        
-        function closeModal() {
-            document.getElementById('objectModal').style.display = 'none';
-            currentObjectTransaction = null;
-            currentObjectProduction = null;
-        }
-        
-        function sendObjection() {
+        // إرسال الاعتراض
+        window.sendObjection = async function() {
             const reason = document.getElementById('objectReason').value;
             if (!reason) {
                 alert('الرجاء كتابة سبب الاعتراض');
                 return;
             }
             
-            let message = '';
-            if (currentObjectTransaction) {
-                message = `📢 اعتراض على معاملة\n\n` +
-                         `رقم العضوية: ${currentMemberId}\n` +
-                         `رقم المعاملة: ${currentObjectTransaction.id}\n` +
-                         `المبلغ: ${currentObjectTransaction.amount} ريال\n` +
-                         `التاريخ: ${currentObjectTransaction.date}\n` +
-                         `الوصف: ${currentObjectTransaction.description}\n` +
-                         `سبب الاعتراض: ${reason}\n\n` +
-                         `الرجاء المراجعة والتأكيد.`;
-            } else if (currentObjectProduction) {
-                message = `📢 اعتراض على إنتاج\n\n` +
-                         `رقم العضوية: ${currentMemberId}\n` +
-                         `المنتج: ${currentObjectProduction.productName}\n` +
-                         `الكمية: ${currentObjectProduction.quantity} قطعة\n` +
-                         `التاريخ: ${currentObjectProduction.date}\n` +
-                         `سبب الاعتراض: ${reason}\n\n` +
-                         `الرجاء المراجعة والتأكيد.`;
+            try {
+                const objection = {
+                    member_id: currentMemberId,
+                    transaction_id: currentObjectType === 'transaction' ? currentObjectItem.id : null,
+                    production_id: currentObjectType === 'production' ? currentObjectItem.id : null,
+                    reason: reason
+                };
+                
+                await addObjection(objection);
+                
+                // إرسال رسالة واتساب
+                const message = `📢 اعتراض من ${currentMemberName} (${currentMemberId})\n\n` +
+                              `النوع: ${currentObjectType === 'transaction' ? 'معاملة مالية' : 'إنتاج'}\n` +
+                              `التفاصيل: ${currentObjectType === 'transaction' ? currentObjectItem.description : currentObjectItem.product_name}\n` +
+                              `المبلغ/الكمية: ${currentObjectType === 'transaction' ? currentObjectItem.amount + ' ريال' : currentObjectItem.quantity + ' قطعة'}\n` +
+                              `التاريخ: ${currentObjectItem.date}\n` +
+                              `سبب الاعتراض: ${reason}`;
+                
+                const whatsappUrl = `https://wa.me/777524788?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+                
+                alert('تم إرسال الاعتراض بنجاح');
+                closeModal();
+            } catch (error) {
+                console.error('خطأ في إرسال الاعتراض:', error);
+                alert('حدث خطأ في إرسال الاعتراض');
             }
-            
-            // إرسال إلى واتساب
-            const phoneNumber = '777524788';
-            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
-            
-            // حفظ الاعتراض في localStorage
-            const objections = JSON.parse(localStorage.getItem('objections') || '[]');
-            objections.push({
-                id: Date.now(),
-                memberId: currentMemberId,
-                transactionId: currentObjectTransaction?.id,
-                productionId: currentObjectProduction?.id,
-                reason: reason,
-                date: new Date().toLocaleDateString('ar-EG'),
-                status: 'pending'
-            });
-            localStorage.setItem('objections', JSON.stringify(objections));
-            
-            alert('تم إرسال الاعتراض بنجاح إلى المشرف عبده');
-            closeModal();
         }
         
+        function closeModal() {
+            document.getElementById('objectModal').style.display = 'none';
+            currentObjectItem = null;
+        }
+        
+        window.closeModal = closeModal;
+        
         function logout() {
-            localStorage.removeItem('memberId');
+            localStorage.clear();
             window.location.href = 'index.html';
         }
         
-        // تشغيل نظام التكرار التلقائي
-        function runAutoRecurring() {
-            const recurringSettings = JSON.parse(localStorage.getItem('recurringSettings') || '[]');
-            const today = new Date().toLocaleDateString('ar-EG');
-            
-            recurringSettings.forEach(setting => {
-                if (setting.memberId === currentMemberId && setting.status === 'active') {
-                    // التحقق من تاريخ التكرار
-                    const lastRun = setting.lastRun || '';
-                    if (lastRun !== today) {
-                        // إنشاء معاملة جديدة متوقعة
-                        const newTransaction = {
-                            id: Date.now() + Math.random(),
-                            memberId: setting.memberId,
-                            amount: setting.amount,
-                            description: setting.description,
-                            type: setting.type,
-                            category: setting.category,
-                            date: today,
-                            status: 'pending',
-                            expected: true
-                        };
-                        
-                        const allTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-                        allTransactions.push(newTransaction);
-                        localStorage.setItem('transactions', JSON.stringify(allTransactions));
-                        
-                        // تحديث آخر تاريخ تشغيل
-                        setting.lastRun = today;
-                        localStorage.setItem('recurringSettings', JSON.stringify(recurringSettings));
-                    }
-                }
-            });
-            
-            loadData();
-        }
+        window.logout = logout;
         
-        // تشغيل التكرار التلقائي عند تحميل الصفحة
-        runAutoRecurring();
-        
-        // تشغيل التكرار كل ساعة
-        setInterval(runAutoRecurring, 3600000);
-        
-        loadData();
+        // تهيئة الصفحة
+        loadUserData();
+        loadTransactions();
+        loadProductions();
     </script>
 </body>
 </html>
